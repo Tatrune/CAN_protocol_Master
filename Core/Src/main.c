@@ -36,14 +36,11 @@
 
 	DHT_DataTypedef DHT11_Data;
 	float Temperature, Humidity;
-	  float analog_value;
-	  char temp[30]; // gia tri cua nhiet do
-	  char humi[30]; // gia tri cua do am
-	  char adc[30]; // gia tri digital
+	float digital_value;
 
-		char tem_sub[] = "Temperature: ";
-		char hum_sub[] = "Humidity: ";
-		char adc_sub[] = "Digital: ";
+	char temp[30]; // value of temperature
+	char humi[30]; // value of humidity
+	char adc[30]; // digital
 
 /* USER CODE END PD */
 
@@ -101,11 +98,10 @@ void MX_USB_HOST_Process(void);
 	{
 		if (GPIO_Pin == GPIO_PIN_0)
 		{
-			TxData[0] = 100;   // ms Delay
-			TxData[1] = 20;    // loop rep
+			TxData[0] = 200;   // Delay (ms)
+			TxData[1] = 20;    // Numbers of Loop
 			TxData[2] = 0;
 			TxData[3] = 0;
-
 
 			HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12); // Green led
 
@@ -177,10 +173,10 @@ int main(void)
   // Active the notification
   HAL_CAN_ActivateNotification(&hcan1, CAN_IT_RX_FIFO0_MSG_PENDING);
 
-	TxHeader.DLC = 4;  // data length [ byte1 : delay cua led / byte2: so lan den nhap nhay ]
+	TxHeader.DLC = 4;  // data length
 	TxHeader.IDE = CAN_ID_STD;
 	TxHeader.RTR = CAN_RTR_DATA;
-	TxHeader.StdId = 0x446;  // ID
+	TxHeader.StdId = 0x446;  // Id of framework
 
   /* USER CODE END 2 */
 
@@ -197,37 +193,37 @@ int main(void)
    	  HAL_ADC_Start(&hadc1);
    	  if(HAL_ADC_PollForConversion(&hadc1, 10)==HAL_OK)
    	  {
-   		  analog_value = HAL_ADC_GetValue(&hadc1);
-   	   	  // warning
-   	   	  if (analog_value>=200)
+   		  digital_value = HAL_ADC_GetValue(&hadc1);
+   	   	  // Warning if threshold is exceeded
+   	   	  if (digital_value>=200)
    	   	  {
-   	   		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, 1);
+   	   		  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, 1); // Red led On
    	   	  }
-   	   	  else HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, 0);
+   	   	  else HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, 0); // Red led off
    	  }
    	  HAL_ADC_Stop(&hadc1);
 
-//			doc dht
+//		  read DHT11
 //   	  DHT_GetData(&DHT11_Data);
 //   	  Temperature = DHT11_Data.Temperature;
 //   	  Humidity = DHT11_Data.Humidity;
 
-   	  // pwm to channel 1
-   	  __HAL_TIM_SetCompare(&htim4,TIM_CHANNEL_1,analog_value);
+   	  // PWM through timer channel 1
+   	  __HAL_TIM_SetCompare(&htim4,TIM_CHANNEL_1,digital_value);
 
 	  	// uint8t to char
-	  	sprintf(temp, "Gia tri cua nhiet do = %.2f\r\n", Temperature);
-	  	sprintf(humi, "Gia tri cua do am = %.2f\r\n", Humidity);
-	  	sprintf(adc, "Gia tri cua adc = %.2f\r\n\n", analog_value);
+	  	sprintf(temp, "Value of Temperature = %.2f\r\n", Temperature);
+	  	sprintf(humi, "Value of Humidity = %.2f\r\n", Humidity);
+	  	sprintf(adc, "Value of Digital = %.2f\r\n\n", digital_value);
 
-	  	// truyen uart
+	  	// Send Uart
 		HAL_UART_Transmit(&huart5, temp , strlen(temp) , HAL_MAX_DELAY);
 		HAL_UART_Transmit(&huart5, humi , strlen(humi) , HAL_MAX_DELAY);
 		HAL_UART_Transmit(&huart5, adc , strlen(adc) , HAL_MAX_DELAY);
 		HAL_Delay(1000);
 
 
-    // blink the LED (CAN)
+    // blink the LED and send data
     if(datacheck)
     {
     	for (int i = 0; i < RxData[1]; i++) {
@@ -236,10 +232,10 @@ int main(void)
     	}
     	datacheck = 0;
 
-    	TxData[0] = 200;   // ms Delay
-    	TxData[1] = 20;    // loop rep
-    	TxData[2] = (uint8_t*)(&Temperature);
-    	TxData[3] = (uint8_t)humi;
+    	TxData[0] = 200;   // Delay (ms)
+    	TxData[1] = 20;    // Numbers of Loop
+    	TxData[2] = (uint8_t*)(&Temperature); // value of Temperature
+    	TxData[3] = (uint8_t*)(&Humidity); // value of Humidity
 
     	if(HAL_CAN_AddTxMessage(&hcan1, &TxHeader, TxData, &TxMailbox) != HAL_OK){ //add
 			Error_Handler();
@@ -256,7 +252,7 @@ void TIM6_DAC_IRQHandler(void)
   /* USER CODE END TIM6_DAC_IRQn 0 */
   HAL_TIM_IRQHandler(&htim6);
   /* USER CODE BEGIN TIM6_DAC_IRQn 1 */
-	  // doc dht
+	  // Read DHT11
 	  DHT_GetData(&DHT11_Data);
 	  Temperature = DHT11_Data.Temperature;
 	  Humidity = DHT11_Data.Humidity;
